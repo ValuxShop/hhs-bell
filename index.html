@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> HHS Bell Schedule Notifier </title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        h1 { color: #333; }
+        p { color: #666; }
+        .settings { margin: 20px auto; max-width: 300px; }
+        label { display: block; margin: 10px 0 5px; }
+        select, input { width: 100%; padding: 8px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <h1>Holly High School Bell Schedule Notifier</h1>
+    <p>Open this page during school days to get notifications before each class/period ends.</p>
+    <p>Notifications are enabled only if you grant permission.</p>
+
+    <div class="settings">
+        <label for="lunchSelect">Select your lunch:</label>
+        <select id="lunchSelect">
+            <option value="none">None (Periods only)</option>
+            <option value="A">A Lunch</option>
+            <option value="B">B Lunch</option>
+            <option value="C">C Lunch</option>
+            <option value="D">D Lunch</option>
+        </select>
+
+        <label for="notifyMinutes">Notify minutes before end:</label>
+        <input type="number" id="notifyMinutes" min="1" max="60" value="10">
+
+        <p>Settings are saved automatically.</p>
+    </div>
+
+    <script>
+        // Request notification permission on load
+        if (Notification.permission !== 'granted') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    console.log('Notification permission granted.');
+                } else {
+                    alert('Notifications are blocked. Please enable them in your browser settings.');
+                }
+            });
+        }
+
+        // Full schedule with names and end times
+        const fullSchedule = [
+            { name: '1st period', endTime: '08:29', type: 'period' },
+            { name: '2nd period', endTime: '09:40', type: 'period' },
+            { name: 'Advisory', endTime: '10:16', type: 'period' },
+            { name: '3rd period', endTime: '11:59', type: 'period' },
+            { name: '4th period', endTime: '13:10', type: 'period' },
+            { name: '5th period', endTime: '14:21', type: 'period' },
+            { name: 'A lunch', endTime: '10:46', type: 'lunch', lunch: 'A' },
+            { name: 'B lunch', endTime: '11:11', type: 'lunch', lunch: 'B' },
+            { name: 'C lunch', endTime: '11:35', type: 'lunch', lunch: 'C' },
+            { name: 'D lunch', endTime: '11:59', type: 'lunch', lunch: 'D' }
+        ];
+
+        // Load saved settings from localStorage
+        const lunchSelect = document.getElementById('lunchSelect');
+        const notifyMinutesInput = document.getElementById('notifyMinutes');
+        const savedLunch = localStorage.getItem('selectedLunch') || 'none';
+        const savedMinutes = localStorage.getItem('notifyMinutes') || '10';
+        lunchSelect.value = savedLunch;
+        notifyMinutesInput.value = savedMinutes;
+
+        // Save settings on change
+        lunchSelect.addEventListener('change', () => {
+            localStorage.setItem('selectedLunch', lunchSelect.value);
+        });
+        notifyMinutesInput.addEventListener('input', () => {
+            localStorage.setItem('notifyMinutes', notifyMinutesInput.value);
+        });
+
+        // Function to get current schedule based on selected lunch
+        function getCurrentSchedule() {
+            const selectedLunch = localStorage.getItem('selectedLunch') || 'none';
+            return fullSchedule.filter(item => {
+                if (item.type === 'period') return true;
+                if (selectedLunch === 'none') return false;
+                return item.lunch === selectedLunch;
+            });
+        }
+
+        // Function to check and send notifications
+        function checkForNotifications() {
+            const now = new Date();
+            const day = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+            const hours = now.getHours();
+            
+            // Only run on weekdays (Mon-Fri) and during school hours (7 AM to 3 PM)
+            if (day >= 1 && day <= 5 && hours >= 7 && hours < 15) {
+                const schedule = getCurrentSchedule();
+                const notifyMinutes = parseInt(localStorage.getItem('notifyMinutes') || '10', 10);
+
+                schedule.forEach(item => {
+                    const [endHour, endMin] = item.endTime.split(':').map(Number);
+                    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endHour, endMin, 0);
+                    const timeDiff = (endDate - now) / (1000 * 60); // minutes until end
+                    
+                    // Notify if within the 1-minute check interval before the set time
+                    if (timeDiff > (notifyMinutes - 1) && timeDiff <= notifyMinutes) {
+                        if (Notification.permission === 'granted') {
+                            new Notification(`${item.name} Ending Soon`, {
+                                body: `${notifyMinutes} minutes until ${item.name} ends at ${item.endTime.replace(/^0/, '')}.`,
+                                icon: 'https://example.com/bell-icon.png' // Optional: add a bell icon URL if you want
+                            });
+                        }
+                    }
+                });
+            }
+        }
+
+        // Run check every minute
+        setInterval(checkForNotifications, 60000); // 60 seconds
+        checkForNotifications(); // Initial check
+    </script>
+</body>
+</html>
